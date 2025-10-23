@@ -1,18 +1,14 @@
+# Imagen base estable y ligera
 FROM alpine:3.20
 
-# Instalar dependencias necesarias
-RUN apk add --no-cache icecast bash
+# Instalar Icecast directamente
+RUN apk add --no-cache icecast
 
-# Crear usuario de sistema (opcional en Render, pero más limpio)
-RUN adduser -D -g '' icecast
-
-# Copiar configuración personalizada
+# Copiar tu configuración personalizada
 COPY icecast.xml /etc/icecast.xml
 
-# Exponer puerto 8000 (Render lo usa automáticamente)
+# Exponer el puerto Icecast
 EXPOSE 8000
 
-# Iniciar Icecast
-USER icecast
+# Ejecutar Icecast directamente como root (Render no necesita usuario dedicado)
 CMD ["icecast", "-c", "/etc/icecast.xml"]
-
