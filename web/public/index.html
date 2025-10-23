@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>BestLive — Panel</title>
+  <style>
+    /* Minimal responsive styling */
+    body{font-family:Inter, system-ui, Arial; margin:0; background:#0b0b0f; color:#eee; display:flex; align-items:center; justify-content:center; min-height:100vh;}
+    .card{background:linear-gradient(180deg, #0f1724, #071029); padding:24px; border-radius:12px; box-shadow:0 8px 30px rgba(2,6,23,0.8); max-width:720px; width:100%;}
+    h1{margin:0 0 8px 0; font-size:20px; color:#fff;}
+    p.lead{margin-top:0;color:#9aa7c7;}
+    .grid{display:grid; grid-template-columns:1fr; gap:12px;}
+    input, button{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); color:inherit;}
+    .row{display:flex; gap:8px;}
+    .muted{color:#7a8799;font-size:13px;}
+    .small{font-size:13px;color:#9aa7c7;}
+    pre{background:#071226;padding:8px;border-radius:8px;overflow:auto;}
+    @media(min-width:720px){ .grid{grid-template-columns:1fr 1fr;} }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>BestLive — Panel de emisoras</h1>
+    <p class="lead">Regístrate para obtén los datos para conectar BUTT / Winamp.</p>
+    <div id="root">
+      <div id="auth" class="grid">
+        <div>
+          <h3>Registrar</h3>
+          <input id="reg_username" placeholder="usuario"/><br/><br/>
+          <input id="reg_email" placeholder="email (opcional)"/><br/><br/>
+          <input id="reg_password" placeholder="contraseña" type="password"/><br/><br/>
+          <button onclick="register()">Registrar</button>
+          <p class="muted">Tras registrar, guarda tu user id para iniciar sesión (demo).</p>
+        </div>
+        <div>
+          <h3>Iniciar sesión</h3>
+          <input id="log_username" placeholder="usuario"/><br/><br/>
+          <input id="log_password" placeholder="contraseña" type="password"/><br/><br/>
+          <button onclick="login()">Entrar</button>
+        </div>
+      </div>
+
+      <div id="panel" style="display:none">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div>
+            <strong id="who"></strong>
+            <div class="small">User ID: <span id="uid"></span></div>
+          </div>
+          <div>
+            <button onclick="logout()">Cerrar sesión</button>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.04);margin:12px 0"/>
+
+        <div>
+          <h3>Crear emisora</h3>
+          <input id="station_name" placeholder="Nombre de la emisora"/><br/><br/>
+          <button onclick="createStation()">Crear</button>
+        </div>
+
+        <div id="stations_list" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    function api(path, opts){ opts = opts || {}; opts.headers = opts.headers || {'Content-Type':'application/json'}; return fetch('/api'+path, opts).then(r=>r.json()); }
+    async function register(){
+      const username = document.getElementById('reg_username').value;
+      const password = document.getElementById('reg_password').value;
+      const email = document.getElementById('reg_email').value;
+      const res = await api('/register', {method:'POST', body: JSON.stringify({username,password,email})});
+      if(res.ok){ alert('Registrado. Guarda tu id: '+res.id); }
+      else alert('Error: '+(res.error||JSON.stringify(res)));
+    }
+    async function login(){
+      const username = document.getElementById('log_username').value;
+      const password = document.getElementById('log_password').value;
+      const res = await api('/login', {method:'POST', body: JSON.stringify({username,password})});
+      if(res.ok){ currentUser = res; document.getElementById('auth').style.display='none'; document.getElementById('panel').style.display='block'; document.getElementById('who').innerText = res.username; document.getElementById('uid').innerText = res.id; loadStations(); }
+      else alert('Error: '+(res.error||JSON.stringify(res)));
+    }
+    function logout(){ currentUser=null; document.getElementById('auth').style.display='grid'; document.getElementById('panel').style.display='none'; }
+    async function createStation(){
+      const name = document.getElementById('station_name').value;
+      if(!name) return alert('Nombre requerido');
+      const res = await api('/create-station', {method:'POST', body: JSON.stringify({user_id: currentUser.id, name})});
+      if(res.ok){ alert('Emisora creada. Detalles:\n' + JSON.stringify(res.details, null, 2)); loadStations(); }
+      else alert('Error: '+(res.error||JSON.stringify(res)));
+    }
+    async function loadStations(){
+      const res = await api('/stations?user_id='+currentUser.id);
+      const cont = document.getElementById('stations_list');
+      if(!res.ok) return cont.innerText='Error';
+      if(res.stations.length===0) cont.innerHTML = '<p class="muted">No tienes emisoras</p>';
+      else {
+        cont.innerHTML = res.stations.map(s=>`<div style="border:1px solid rgba(255,255,255,0.03);padding:8px;border-radius:8px;margin-bottom:8px">
+          <strong>${s.name}</strong><div class="small">mount: ${s.mountpoint}</div>
+          <div style="margin-top:6px"><button onclick="showStation('${s.id}')">Ver detalles</button></div>
+        </div>`).join('');
+      }
+    }
+    async function showStation(id){
+      const res = await api('/station/'+id);
+      if(!res.ok) return alert('error');
+      const s = res.station;
+      alert('Detalles:\nListen URL: '+s.icecast.listen_url + '\nMount: '+s.mountpoint + '\nSource password: ' + s.source_password + '\nServer: '+s.icecast.server + ':8000');
+    }
+  </script>
+</body>
+</html>
